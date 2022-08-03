@@ -34,12 +34,19 @@ class Genxword(object):
     def __init__(self, auto=False, mixmode=False):
         self.auto = auto
         self.mixmode = mixmode
+        self.agentwordlist = None
+        self.agentnwords = None
+        self.agentwords = ''
 
     def wlist(self, words, nwords=50):
         """Create a list of words and clues."""
-        wordlist = [line.strip().split(' ', 1) for line in words if line.strip()]
-        if len(wordlist) > nwords:
-            wordlist = random.sample(wordlist, nwords)
+        if self.agentnwords is None:
+            self.agentnwords = nwords
+        if self.agentwordlist is None:
+            self.agentwordlist = [line.split(None, 1) for line in words] #if line.strip()]
+
+        if len(self.agentwordlist) > nwords:
+            wordlist = random.sample(self.agentwordlist, nwords)
         self.wordlist = [[ComplexString(line[0].upper()), line[-1]] for line in wordlist]
         self.wordlist.sort(key=lambda i: len(i[0]), reverse=True)
         if self.mixmode:
@@ -84,21 +91,44 @@ class Genxword(object):
         i = 0
         while 1:
             print(_('Calculating your crossword...'))
-            calc = Crossword(self.nrow, self.ncol, '-', self.wordlist)
-            print(calc.compute_crossword())
+            calc = Crossword(self.nrow, self.ncol, name, '-', self.wordlist)
+            try:
+                agentx, agenty = calc.compute_crossword()
+                print(agentx, agenty)
+               # print(calc.compute_crossword()) og
+            except ValueError:
+                print(_('Error: The grid is too small to fit all the words.'))
             if self.auto:
-                if float(len(calc.best_wordlist))/len(self.wordlist) < 0.9 and i < 5:
-                    self.nrow += 2; self.ncol += 2
+                if agenty:
+                    break
+                elif i < 5: #checks to see if all the words on on the grid of desired word c ount
                     i += 1
-                else:
-                    break
+                    self.nrow += 1; self.ncol += 1
+                elif i >= 5: # Restarts and calculates with new word list
+                    self.wlist(self.agentwords, self.agentnwords)
+                    self.grid_size()
+                    continue
+                # if float(len(calc.best_wordlist))/len(self.wordlist) < 0.9 and i < 5:
+                #     self.nrow += 1; self.ncol += 1
+                    #i += 1
             else:
-                h = input(_('Are you happy with this solution? [Y/n] '))
-                if h.strip() != _('n'):
+                print(self.nrow, self.ncol)
+                h = input(_('Are you happy with this solution? [Y/n]. Else [a/s] to change grid size: '))
+                if h.strip().lower() == 'c':
+                    self.wlist(self.agentwords, self.agentnwords)
+                    self.grid_size()
+                if h.strip() == 's':
+                    try:
+                        self.nrow -= 2; self.ncol -= 2
+                    except ValueError:
+                        print('Grid size cannot be reduced further.')
+                if h.strip() == 'a':
+                    self.nrow += 2; self.ncol += 2
+                elif h.strip().lower() == 'y':
                     break
-                inc_gsize = input(_('And increase the grid size? [Y/n] '))
-                if inc_gsize.strip() != _('n'):
-                    self.nrow += 2;self.ncol += 2
+                # inc_gsize = input(_('And increase the grid size? [Y/n] '))
+                # if inc_gsize.strip() != _('n'):
+                #     self.nrow += 2;self.ncol += 2
         lang = _('Across/Down').split('/')
         message = _('The following files have been saved to your current working directory:\n')
         exp = Exportfiles(self.nrow, self.ncol, calc.best_grid, calc.best_wordlist, '-')

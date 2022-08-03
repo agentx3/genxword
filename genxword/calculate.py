@@ -29,12 +29,14 @@ from operator import itemgetter
 from collections import defaultdict
 
 class Crossword(object):
-    def __init__(self, rows, cols, empty=' ', available_words=[]):
+    def __init__(self, rows, cols, name, empty=' ', available_words=[]):
         self.rows = rows
         self.cols = cols
         self.empty = empty
         self.available_words = available_words
         self.let_coords = defaultdict(list)
+        self.name = name
+        self.answer = None
 
     def prep_grid_words(self):
         self.current_wordlist = []
@@ -58,10 +60,14 @@ class Crossword(object):
             if len(self.best_wordlist) == wordlist_length:
                 break
         #answer = '\n'.join([''.join(['{} '.format(c) for c in self.best_grid[r]]) for r in range(self.rows)])
-        answer = '\n'.join([''.join([u'{} '.format(c) for c in self.best_grid[r]])
+        self.answer = '\n'.join([''.join([u'{} '.format(c) for c in self.best_grid[r]])
                             for r in range(self.rows)])
-        return answer + '\n\n' + str(len(self.best_wordlist)) + ' out of ' + str(wordlist_length)
-
+        with open(self.name+'_grid.txt', 'w') as grid_file:
+            grid_file.write(self.answer)
+            grid_file.close() #agent
+        #return self.answer + '\n\n' + str(len(self.best_wordlist)) + ' out of ' + str(wordlist_length) OG
+        count_out_of_total = self.answer + '\n\n' + str(len(self.best_wordlist)) + ' out of ' + str(wordlist_length) #agent
+        return count_out_of_total, len(self.best_wordlist) == wordlist_length; #agent
     def get_coords(self, word):
         """Return possible coordinates for each letter."""
         word_length = len(word[0])
@@ -146,8 +152,11 @@ class Crossword(object):
         self.current_wordlist.append(word)
 
         horizontal = not vertical
-        for letter in word[0]:
+        for i, letter in enumerate(word[0]):
             self.grid[row][col] = letter
+            # if i == 0: agent's doing
+            #     print(letter, word)
+            #     letter = str(i+1) + '' + letter
             if (row, col, horizontal) not in self.let_coords[letter]:
                 self.let_coords[letter].append((row, col, vertical))
             else:
@@ -193,19 +202,20 @@ class Exportfiles(object):
                     context.rectangle(xoffset+(i*px), yoffset+(r*px), px, px)
                     context.stroke()
                     context.set_line_width(1.0)
-                    context.set_source_rgb(0, 0, 0)
+                    context.set_source_rgb(1, 1, 1)
                     context.rectangle(xoffset+1+(i*px), yoffset+1+(r*px), px-2, px-2)
                     context.stroke()
                     if '_key.' in name:
-                        self.draw_letters(c, context, xoffset+(i*px)+10, yoffset+(r*px)+8, 'monospace 11')
+                        self.draw_letters(c, context, xoffset+(i*px)+15, yoffset+(r*px)+12, 'monospace bold 20')
 
         self.order_number_words()
+        context.set_source_rgb(0, 1, 0.7)
         for word in self.wordlist:
             if RTL:
                 x, y = ((self.cols-1)*px)+xoffset-(word[3]*px), yoffset+(word[2]*px)
             else:
                 x, y = xoffset+(word[3]*px), yoffset+(word[2]*px)
-            self.draw_letters(str(word[5]), context, x+3, y+2, 'monospace 6')
+            self.draw_letters(str(word[5]), context, x+3, y+2, 'monospace bold 10')
 
     def draw_letters(self, text, context, xval, yval, fontdesc):
         context.move_to(xval, yval)
@@ -217,16 +227,16 @@ class Exportfiles(object):
         PangoCairo.show_layout(context, layout)
 
     def create_img(self, name, RTL):
-        px = 28
+        px = 50
         if name.endswith('png'):
             surface = cairo.ImageSurface(cairo.FORMAT_RGB24, 10+(self.cols*px), 10+(self.rows*px))
         else:
             surface = cairo.SVGSurface(name, 10+(self.cols*px), 10+(self.rows*px))
         context = cairo.Context(surface)
-        context.set_source_rgb(1, 1, 1)
+        context.set_source_rgb(0, 0, 0)
         context.rectangle(0, 0, 10+(self.cols*px), 10+(self.rows*px))
         context.fill()
-        self.draw_img(name, context, 28, 5, 5, RTL)
+        self.draw_img(name, context, px, 5, 5, RTL)
         if name.endswith('png'):
             surface.write_to_png(name)
         else:
@@ -338,6 +348,7 @@ class Exportfiles(object):
         with open(name, 'w') as clues_file:
             clues_file.write(self.word_bank())
             clues_file.write(self.legend(lang))
+            clues_file.close()
 
     def write_ipuz(self, name, filename, lang):
         # Generate the clue numbers if we haven't already
