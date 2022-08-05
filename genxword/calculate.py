@@ -59,6 +59,75 @@ class Crossword(object):
                 self.best_grid = list(self.grid)
             if len(self.best_wordlist) == wordlist_length:
                 break
+        ###########
+
+        # Get the lines of the empty rows
+        empty_lines = []
+        for i, line in enumerate(list(self.best_grid)):
+            empty = True
+            for char in line:
+                if char != self.empty:
+                    empty = False
+            if empty:
+                empty_lines.append(i)
+
+        # Remove the lines of the empty rows
+        for no in reversed(empty_lines):
+            self.best_grid.pop(no)
+        self.rows = len(self.best_grid)
+
+        # Count the lines that were removed on top of the grid to shift indices
+        sub = 0
+        if empty_lines:
+            if empty_lines[0] == 0:
+                sub += 1
+                for i in range(len(empty_lines)):
+                    try:
+                        if empty_lines[i] + 1 == empty_lines[i + 1]:
+                            sub += 1
+                            continue
+                        else:
+                            break
+                    except IndexError:
+                        break
+
+        # Get the lines of the empty collumns:
+        empty_collumns = []
+        for i in range(len(self.best_grid[0])):
+            empty = True
+            for j in range(len(self.best_grid)):
+                if self.best_grid[j][i] != self.empty:
+                    empty = False
+            if empty:
+                empty_collumns.append(i)
+
+
+        # Remove the lines of the empty collumns
+        for no in reversed(empty_collumns):
+            for line in self.best_grid:
+                line.pop(no)
+
+
+        # Count the lines that were removed on left of the grid to shift indices
+        subv = 0
+        if empty_collumns:
+            if empty_collumns[0] == 0:
+                subv += 1
+                for i in range(len(empty_collumns)):
+                    try:
+                        if empty_collumns[i] + 1 == empty_collumns[i + 1]:
+                            subv += 1
+                            continue
+                        else:
+                            break
+                    except IndexError:
+                        break
+        self.rows = len(self.best_grid)
+        self.cols = len(self.best_grid[0])
+        for i, word in enumerate(self.best_wordlist):
+            self.best_wordlist[i][2] -= sub
+            self.best_wordlist[i][3] -= subv
+        ##########################
         #answer = '\n'.join([''.join(['{} '.format(c) for c in self.best_grid[r]]) for r in range(self.rows)])
         self.answer = '\n'.join([''.join([u'{} '.format(c) for c in self.best_grid[r]])
                             for r in range(self.rows)])
@@ -175,9 +244,10 @@ class Crossword(object):
 
 class Exportfiles(object):
     def __init__(self, rows, cols, grid, wordlist, empty=' '):
-        self.rows = rows
-        self.cols = cols
+        self.rows = len(grid) #agent
+        self.cols = len(grid[0]) #agent
         self.grid = grid
+        print(wordlist)
         self.wordlist = wordlist
         self.empty = empty
 
@@ -197,25 +267,58 @@ class Exportfiles(object):
         for r in range(self.rows):
             for i, c in enumerate(self.grid[r]):
                 if c != self.empty:
-                    context.set_line_width(1.0)
-                    context.set_source_rgb(0.5, 0.5, 0.5)
+                    context.set_line_width(1.0) # Inner lines
+                    context.set_source_rgb(0.0, 0.0, 0.0)
                     context.rectangle(xoffset+(i*px), yoffset+(r*px), px, px)
                     context.stroke()
                     context.set_line_width(1.0)
-                    context.set_source_rgb(1, 1, 1)
+                    context.set_source_rgb(0.0, 0.0, 0.0) # Actual box boundaries
                     context.rectangle(xoffset+1+(i*px), yoffset+1+(r*px), px-2, px-2)
                     context.stroke()
-                    if '_key.' in name:
+                    context.set_source_rgb(1.0, 1.0, 1.0) # Text
+                    if '_key.' in name: # Drawing the answer key grid letters
                         self.draw_letters(c, context, xoffset+(i*px)+15, yoffset+(r*px)+12, 'monospace bold 20')
 
         self.order_number_words()
-        context.set_source_rgb(0, 1, 0.7)
-        for word in self.wordlist:
+        context.set_source_rgb(0, 1, 0.7) # Number colors
+        first_letter = [[0 for _ in range(self.cols)] for _ in range(self.rows)]
+        #print(self.cols, self.rows) ##########
+        import copy
+        tempwordlist = copy.deepcopy(self.wordlist) ######### for able
+
+        for i, word in enumerate(self.wordlist):
+
+            # Original:
+            # if RTL:
+            #     x, y = ((self.cols-1)*px)+xoffset-(word[3]*px), yoffset+(word[2]*px)
+            # else:
+            #     x, y = xoffset+(word[3]*px), yoffset+(word[2]*px)
+
+            ########## For LTR and DTU#####################3
             if RTL:
                 x, y = ((self.cols-1)*px)+xoffset-(word[3]*px), yoffset+(word[2]*px)
             else:
-                x, y = xoffset+(word[3]*px), yoffset+(word[2]*px)
-            self.draw_letters(str(word[5]), context, x+3, y+2, 'monospace bold 10')
+                if word[4]:
+                    tempwordlist[i][2] += len(word[0])-1
+                    x, y = xoffset+(word[3]*px), yoffset+((word[2]+len(word[0])-1)*px)
+                    first_letter[word[2]+len(word[0])-1][word[3]] = str(word[5]) + word[0][-1]
+                else:
+                    tempwordlist[i][3] =+ len(word[0]) - 1
+                    x, y = xoffset+((word[3]+len(word[0])-1)*px), yoffset+(word[2]*px)
+                    first_letter[word[2]][word[3]+len(word[0])-1] = str(word[5]) + word[0][-1]
+            #################################################################
+
+
+            self.draw_letters(str(word[5]), context, x+3, y+2, 'monospace bold 12') # Numbers in grid
+            #print(word[2:5]) ########
+            # first_letter[word[2]][word[3]] = str(word[5])+word[0][0]
+        with open("number_position_with_alpha.json", "w") as f: # This function creates a json file with the number position
+            json.dump(first_letter, f)
+            f.close()
+        with open("word_list.json", "w") as f:
+            json.dump(tempwordlist, f, indent=2)  # tempword list  for able, else just use wordlist
+            f.close()
+
 
     def draw_letters(self, text, context, xval, yval, fontdesc):
         context.move_to(xval, yval)
@@ -227,14 +330,14 @@ class Exportfiles(object):
         PangoCairo.show_layout(context, layout)
 
     def create_img(self, name, RTL):
-        px = 50
+        px = 50 # Pixel size
         if name.endswith('png'):
             surface = cairo.ImageSurface(cairo.FORMAT_RGB24, 10+(self.cols*px), 10+(self.rows*px))
         else:
             surface = cairo.SVGSurface(name, 10+(self.cols*px), 10+(self.rows*px))
         context = cairo.Context(surface)
-        context.set_source_rgb(0, 0, 0)
-        context.rectangle(0, 0, 10+(self.cols*px), 10+(self.rows*px))
+        context.set_source_rgb(0, 0, 0) # Background color
+        context.rectangle(0, 0, 10+(self.cols*px), 10+(self.rows*px)) # Background rectangle
         context.fill()
         self.draw_img(name, context, px, 5, 5, RTL)
         if name.endswith('png'):
@@ -345,6 +448,27 @@ class Exportfiles(object):
         return outStrA + outStrD
 
     def clues_txt(self, name, lang):
+        ##############################################################################
+        # Agent injecting json creation function
+        clues_dict = {"across": [], "down": []}
+        direction = ""
+        for line in self.legend(lang).splitlines():
+            if line.strip() == "Across":
+                direction = "across"
+                continue
+            elif line.strip() == "Down":
+                direction = "down"
+                continue
+            elif len(line.strip()) > 0:
+                if line.strip()[0].isdigit():
+                    clues_dict[direction].append(line.strip())
+            else:
+                pass
+        # print(clues_dict)
+        with open(name[:-4] + '.json', 'w') as f:
+            json.dump(clues_dict, f)
+            f.close()
+        ##################################################################
         with open(name, 'w') as clues_file:
             clues_file.write(self.word_bank())
             clues_file.write(self.legend(lang))

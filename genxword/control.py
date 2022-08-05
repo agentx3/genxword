@@ -65,13 +65,18 @@ class Genxword(object):
     def grid_size(self, gtkmode=False):
         """Calculate the default grid size."""
         if len(self.wordlist) <= 20:
-            self.nrow = self.ncol = 17
+            self.nrow = self.ncol = 1 # No minimum size forced agent
         elif len(self.wordlist) <= 100:
             self.nrow = self.ncol = int((round((len(self.wordlist) - 20) / 8.0) * 2) + 19)
         else:
             self.nrow = self.ncol = 41
         if min(self.nrow, self.ncol) <= len(self.wordlist[0][0]):
             self.nrow = self.ncol = len(self.wordlist[0][0]) + 2
+
+        # Enable this next line to force the grid size to a certain value. Keep it disabled in most cases. Typically,
+        # this is for a fixed-size grid and the length is based on the length of the longest word.
+        # self.nrow = self.ncol = 15
+
         if not gtkmode and not self.auto:
             gsize = str(self.nrow) + ', ' + str(self.ncol)
             grid_size = input(_('Enter grid size (') + gsize + _(' is the default): '))
